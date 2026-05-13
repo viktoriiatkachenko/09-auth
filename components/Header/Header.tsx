@@ -1,21 +1,23 @@
 import Link from 'next/link';
+import AuthNavigation from '../AuthNavigation/AuthNavigation';
 import css from './Header.module.css';
 
 export default function Header() {
   return (
     <header className={css.header}>
-      <Link href="/" aria-label="Home">
+      <Link href="/" className={css.logo}>
         NoteHub
       </Link>
 
-      <nav aria-label="Main Navigation">
+      <nav>
         <ul className={css.navigation}>
-          <li>
-            <Link href="/">Home</Link>
+          <li className={css.navigationItem}>
+            <Link href="/notes" className={css.navigationLink}>
+              Notes
+            </Link>
           </li>
-          <li>
-            <Link href="/notes/filter/all">Notes</Link>
-          </li>
+
+          <AuthNavigation />
         </ul>
       </nav>
     </header>
