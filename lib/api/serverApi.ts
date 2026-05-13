@@ -1,64 +1,98 @@
-import axios from 'axios';
+import axios, { type AxiosResponse } from 'axios';
 import { cookies } from 'next/headers';
-import type { Note } from '@/types/note';
-import type { User } from '@/types/user';
 
-interface NotesResponse {
+import type { Note, NoteTag } from '../../types/note';
+import type { User } from '../../types/user';
+
+const baseURL = process.env.NEXT_PUBLIC_API_URL + '/api';
+
+export interface FetchNotesParams {
+  page: number;
+  perPage: number;
+  search?: string;
+  tag?: NoteTag;
+}
+
+export interface FetchNotesResponse {
   notes: Note[];
   totalPages: number;
 }
 
-interface FetchNotesParams {
-  search?: string;
-  perPage: number;
-  page?: number;
-  tag?: string;
-}
-
-const getServerApi = async () => {
+const createServerApi = async () => {
   const cookieStore = await cookies();
 
+  const cookieHeader = cookieStore.toString();
+
   return axios.create({
-    baseURL: `${process.env.NEXT_PUBLIC_API_URL}/api`,
+    baseURL,
     headers: {
-      Cookie: cookieStore.toString(),
+      Cookie: cookieHeader,
     },
+    withCredentials: true,
   });
 };
 
 export const fetchNotes = async ({
-  search = '',
-  page = 1,
+  page,
+  perPage,
+  search,
   tag,
-}: FetchNotesParams): Promise<NotesResponse> => {
-  const serverApi = await getServerApi();
+}: FetchNotesParams): Promise<FetchNotesResponse> => {
+  const api = await createServerApi();
 
-  const { data } = await serverApi.get<NotesResponse>('/notes', {
-    params: {
-      search,
-      page,
-      perPage: 12,
-      tag,
-    },
-  });
+  const params: FetchNotesParams = {
+    page,
+    perPage,
+  };
 
-  return data;
+  if (search?.trim()) {
+    params.search = search.trim();
+  }
+
+  if (tag) {
+    params.tag = tag;
+  }
+
+  const response = await api.get<FetchNotesResponse>(
+    '/notes',
+    {
+      params,
+    }
+  );
+
+  return response.data;
 };
 
-export const fetchNoteById = async (id: string): Promise<Note> => {
-  const serverApi = await getServerApi();
-  const { data } = await serverApi.get<Note>(`/notes/${id}`);
-  return data;
+export const fetchNoteById = async (
+  id: string
+): Promise<Note> => {
+  const api = await createServerApi();
+
+  const response = await api.get<Note>(
+    `/notes/${id}`
+  );
+
+  return response.data;
 };
 
 export const getMe = async (): Promise<User> => {
-  const serverApi = await getServerApi();
-  const { data } = await serverApi.get<User>('/users/me');
-  return data;
+  const api = await createServerApi();
+
+  const response = await api.get<User>(
+    '/users/me'
+  );
+
+  return response.data;
 };
 
-export const checkSession = async (): Promise<User | null> => {
-  const serverApi = await getServerApi();
-  const { data } = await serverApi.get<User | null>('/auth/session');
-  return data;
+export const checkSession = async (): Promise<
+  AxiosResponse<User | null>
+> => {
+  const api = await createServerApi();
+
+  const response = await api.get<User | null>(
+    '/auth/session'
+  );
+
+  return response;
 };
