@@ -10,6 +10,7 @@ interface NotesResponse {
 
 interface FetchNotesParams {
   search?: string;
+  perPage: number;
   page?: number;
   tag?: string;
 }
