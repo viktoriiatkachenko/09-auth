@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
+
+import { checkSession } from './lib/api/serverApi';
 
 const privateRoutes = ['/profile', '/notes'];
-
 const authRoutes = ['/sign-in', '/sign-up'];
 
 export async function proxy(request: NextRequest) {
-  const accessToken = request.cookies.get('accessToken')?.value;
+  const cookieStore = await cookies();
 
-  const refreshToken = request.cookies.get('refreshToken')?.value;
+  let accessToken = cookieStore.get('accessToken')?.value;
+  const refreshToken = cookieStore.get('refreshToken')?.value;
 
   const pathname = request.nextUrl.pathname;
 
@@ -16,58 +19,38 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith(route)
   );
 
-  const isAuthRoute = authRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 
   if (!accessToken && refreshToken) {
-    try {
-      const response = await fetch(
-        `${request.nextUrl.origin}/api/auth/session`,
-        {
-          method: 'GET',
-          headers: {
-            Cookie: request.headers.get('cookie') || '',
-          },
-        }
-      );
+    const response = await checkSession();
 
-      if (response.ok) {
-        const nextResponse = NextResponse.next();
+    const setCookie = response.headers['set-cookie'];
 
-        const setCookie = response.headers.get('set-cookie');
+    if (setCookie) {
+      const cookiesArray = Array.isArray(setCookie) ? setCookie : [setCookie];
 
-        if (setCookie) {
-          nextResponse.headers.set('set-cookie', setCookie);
-        }
+      cookiesArray.forEach((cookie) => {
+        const [cookiePart] = cookie.split(';');
+        const [name, value] = cookiePart.split('=');
 
-        return nextResponse;
-      }
-    } catch {
-      // ignore
+        cookieStore.set(name, value);
+      });
+
+      accessToken = cookieStore.get('accessToken')?.value;
     }
   }
 
-  if (isPrivateRoute && !accessToken && !refreshToken) {
-    return NextResponse.redirect(
-      new URL('/sign-in', request.url)
-    );
+  if (isPrivateRoute && !accessToken) {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  if (isAuthRoute && (accessToken || refreshToken)) {
-    return NextResponse.redirect(
-      new URL('/', request.url)
-    );
+  if (isAuthRoute && accessToken) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/profile/:path*',
-    '/notes/:path*',
-    '/sign-in',
-    '/sign-up',
-  ],
+  matcher: ['/profile/:path*', '/notes/:path*', '/sign-in', '/sign-up'],
 };
